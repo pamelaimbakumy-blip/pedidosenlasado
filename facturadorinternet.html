@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Facturación y Caja Pro - Paradero Kalikanto</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            color: #333;
+            padding: 20px;
+        }
+
+        h1, h2, h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .grid-layout {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 15px;
+        }
+
+        .grid-col-left {
+            display: table-cell;
+            width: 55%;
+            vertical-align: top;
+        }
+
+        .grid-col-right {
+            display: table-cell;
+            width: 45%;
+            vertical-align: top;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* Botones de menú dinámicos */
+        .menu-grid {
+            display: block;
+        }
+        .menu-btn {
+            display: inline-block;
+            width: calc(33.33% - 10px);
+            margin: 5px;
+            color: white;
+            border: none;
+            padding: 15px 10px;
+            font-size: 13px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            vertical-align: top;
+            box-shadow: 0 2px 2px rgba(0,0,0,0.1);
+        }
+        .menu-btn:hover { filter: brightness(0.9); }
+        .menu-btn span {
+            display: block;
+            font-size: 11px;
+            font-weight: normal;
+            margin-top: 3px;
+            opacity: 0.9;
+        }
+
+        /* Colores asignables */
+        .btn-color-azul { background-color: #3498db; }
+        .btn-color-verde { background-color: #27ae60; }
+        .btn-color-naranja { background-color: #e67e22; }
+        .btn-color-purpura { background-color: #9b59b6; }
+        .btn-color-rojo { background-color: #e74c3c; }
+
+        /* Formularios */
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
+        }
+
+        /* Tablas */
+        .order-table, .price-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .order-table th, .order-table td, .price-table th, .price-table td {
+            padding: 8px; text-align: left; border-bottom: 1px solid #ddd; font-size: 14px;
+        }
+        .order-table th, .price-table th { background-color: #f8f9fa; font-weight: bold; }
+        
+        .qty-btn { padding: 2px 6px; margin: 0 2px; cursor: pointer; background: #e0e0e0; border: none; border-radius: 3px; }
+
+        .totals-section { margin-top: 15px; background: #fdfefe; padding: 10px; border-radius: 4px; border: 1px solid #eee; }
+        .total-row { display: block; text-align: right; font-size: 15px; margin-bottom: 5px; }
+        .total-row.grand-total { font-size: 18px; font-weight: bold; color: #27ae60; }
+
+        /* Botones de acción generales */
+        .btn-action {
+            width: 100%; padding: 12px; font-size: 14px; font-weight: bold; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;
+        }
+        .btn-green { background-color: #27ae60; }
+        .btn-orange { background-color: #e67e22; }
+        .btn-purple { background-color: #9b59b6; }
+        .btn-gray { background-color: #7f8c8d; }
+        .btn-red { background-color: #e74c3c; }
+        .btn-blue { background-color: #2980b9; }
+
+        /* Pestañas (Tabs) */
+        .tabs-header { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 10px; }
+        .tab-link {
+            flex: 1; padding: 10px; text-align: center; background: #eee; cursor: pointer; font-weight: bold; border: none; transition: 0.2s;
+        }
+        .tab-link.active { background: #fff; border-bottom: 4px solid #3498db; color: #3498db; }
+        .tab-content { display: none; max-height: 400px; overflow-y: auto; }
+        .tab-content.active { display: block; }
+
+        /* Items del Historial */
+        .order-card-item {
+            background: #f9f9f9; padding: 12px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 10px; font-size: 13px; position: relative;
+        }
+        .order-card-item.pagado { border-left: 5px solid #27ae60; }
+        .order-card-item.por_cobrar { border-left: 5px solid #e67e22; }
+        
+        .action-container { position: absolute; right: 12px; top: 12px; }
+        .mini-btn {
+            border: none; padding: 4px 8px; font-size: 11px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-left: 5px; color: white;
+        }
+
+        .collapsible-content { display: none; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px; }
+
+        /* Separación de Seguridad del botón vaciar */
+        .safety-space { margin-top: 45px; border-top: 1px dashed #ddd; padding-top: 15px; }
+
+        /* Área de Impresión 57mm */
+        @media print {
+            body * { visibility: hidden; }
+            #ticket-print-area, #ticket-print-area * { visibility: visible; }
+            #ticket-print-area {
+                position: absolute; left: 0; top: 0; width: 57mm; font-family: 'Courier New', monospace; font-size: 12px;
+            }
+            .ticket-header { text-align: center; font-weight: bold; }
+            .ticket-divider { border-top: 1px dashed #000; margin: 5px 0; }
+            .ticket-row { display: block; clear: both; font-size: 11px; }
+            .left-part { float: left; width: 70%; word-wrap: break-word; }
+            .right-part { float: right; width: 30%; text-align: right; }
+        }
+    </style>
+</head>
+<body onload="inicializar()">
+
+    <div class="container">
+        <h1 style="display:inline-block;">Sistema de Facturación Inteligente Pro</h1>
+        <span id="indicador-edicion" style="display:none; background:#e67e22; color:white; padding:5px 10px; border-radius:4px; font-weight:bold; margin-left:15px; font-size:14px; vertical-align:middle;">✏️ MODO EDICIÓN ACTIVO</span>
+
+        <div class="grid-layout">
+            
+            <div class="grid-col-left">
+                <div class="card">
+                    <h2>Menú de Ventas</h2>
+                    <div id="menu-container" class="menu-grid"></div>
+                </div>
+
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>Control de Egresos</h2>
+                        <button onclick="toggleSeccion('historial-egresos-box')" class="mini-btn btn-blue" style="color:white; padding:5px 10px;">Ver / Ocultar Historial</button>
+                    </div>
+                    <input type="hidden" id="egreso-edit-index" value="-1">
+                    <div style="display: table; width: 100%; margin-top:10px;">
+                        <div style="display: table-cell; width: 50%; padding-right: 10px;">
+                            <input type="text" id="egreso-motivo" placeholder="Motivo del gasto" style="width:100%; padding: 8px;">
+                        </div>
+                        <div style="display: table-cell; width: 25%; padding-right: 10px;">
+                            <input type="number" id="egreso-monto" step="0.01" placeholder="Monto $" style="width:100%; padding: 8px;">
+                        </div>
+                        <div style="display: table-cell; width: 25%;">
+                            <button onclick="guardarEgreso()" id="btn-salvar-egreso" class="btn-action btn-orange" style="margin-top:0; padding: 8px;">Guardar Gasto</button>
+                        </div>
+                    </div>
+                    
+                    <div id="historial-egresos-box" class="collapsible-content" style="display: block;">
+                        <table class="price-table">
+                            <thead>
+                                <tr><th>Motivo</th><th>Monto</th><th>Acción</th></tr>
+                            </thead>
+                            <tbody id="tabla-egresos-cuerpo"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>📋 Clasificación de Pedidos de Hoy</h2>
+                    <div class="tabs-header">
+                        <button class="tab-link active" onclick="cambiarPestaña('tab-pagados', this)">🟢 PAGADOS / MIXTOS</button>
+                        <button class="tab-link" onclick="cambiarPestaña('tab-cobrar', this)">🟠 POR COBRAR (Editables)</button>
+                    </div>
+                    
+                    <div id="tab-pagados" class="tab-content active"></div>
+                    <div id="tab-cobrar" class="tab-content"></div>
+                </div>
+
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>📝 Bitácora de Comentarios / Notas</h2>
+                        <button onclick="toggleSeccion('seccion-comentarios-desplegable')" class="mini-btn btn-gray" style="padding:5px 10px;">Desplegar / Ocultar</button>
+                    </div>
+                    <div id="seccion-comentarios-desplegable" class="collapsible-content">
+                        <div class="form-group">
+                            <textarea id="nuevo-comentario-texto" placeholder="Escribe una observación, novedad o nota interna aquí..." rows="2"></textarea>
+                            <button onclick="agregarComentario()" class="btn-action btn-blue" style="margin-top:5px; padding:6px; font-size:12px;">Añadir Nota con Hora</button>
+                        </div>
+                        <div id="lista-comentarios-cuerpo" style="max-height:200px; overflow-y:auto; font-size:12px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-col-right">
+                <div class="card">
+                    <h2>Datos del Pedido actual <span id="num-pedido-editando" style="color:#e67e22;"></span></h2>
+                    <div class="form-group">
+                        <label>Nombre del Cliente o Mesa:</label>
+                        <input type="text" id="cliente-nombre" placeholder="Mesa 1 / Consumidor Final">
+                    </div>
+                    <div class="form-group" style="display: inline-block; width: 48%; margin-right: 4%;">
+                        <label>Teléfono:</label>
+                        <input type="text" id="cliente-telefono" placeholder="N/A">
+                    </div>
+                    <div class="form-group" style="display: inline-block; width: 48%;">
+                        <label>Dirección:</label>
+                        <input type="text" id="cliente-direccion" placeholder="N/A">
+                    </div>
+                    <div class="form-group">
+                        <label>Estado / Cuenta:</label>
+                        <select id="metodo-pago" onchange="calcularVuelto()">
+                            <option value="efectivo">Pagado - Efectivo</option>
+                            <option value="transferencia">Pagado - Transferencia</option>
+                            <option value="mixto">🔵 Pagado - Mixto (Efe + Trans)</option>
+                            <option value="por_cobrar">❌ Por Cobrar / Cuenta Pendiente</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Pedido Detalle</h2>
+                    <table class="order-table">
+                        <thead>
+                            <tr><th>Producto</th><th style="text-align: center; width: 80px;">Cant.</th><th style="text-align: right;">Total</th></tr>
+                        </thead>
+                        <tbody id="pedido-detalles"></tbody>
+                    </table>
+
+                    <div class="totals-section">
+                        <div class="total-row grand-total">Total: $<span id="total-pagar">0.00</span></div>
+                        
+                        <div id="seccion-efectivo">
+                            <div class="total-row">Monto Recibido: <input type="number" id="monto-pagado" step="0.01" style="width: 80px; text-align: right;" oninput="calcularVuelto()"></div>
+                            <div class="total-row">Vuelto: $<span id="monto-vuelto">0.00</span></div>
+                        </div>
+
+                        <div id="seccion-mixto" style="display:none; border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 5px;">
+                            <div class="total-row">Efectivo Aportado: <input type="number" id="mixto-efectivo" step="0.01" style="width: 80px; text-align: right;" oninput="calcularVuelto()"></div>
+                            <div class="total-row">Transferencia Aportada: <input type="number" id="mixto-transferencia" step="0.01" style="width: 80px; text-align: right;" oninput="calcularVuelto()"></div>
+                            <div class="total-row" style="font-weight: bold; color: #2980b9;">Suma Ingresada: $<span id="mixto-suma-ingresada">0.00</span></div>
+                            <div class="total-row">Vuelto (del efectivo): $<span id="mixto-vuelto">0.00</span></div>
+                        </div>
+                    </div>
+
+                    <button onclick="procesarVenta(true)" class="btn-action btn-green">🖨️ Registrar e Imprimir Ticket</button>
+                    <button onclick="procesarVenta(false)" id="btn-solo-registrar" class="btn-action btn-purple">💾 Solo Registrar Pedido</button>
+                    
+                    <div class="safety-space">
+                        <button onclick="cancelarPedidoActual()" class="btn-action btn-gray" style="font-size:11px; padding: 5px; background-color:#a0a0a0;">⚠️ Vaciar Pedido Actual / Cancelar Edición</button>
+                    </div>
+                </div>
+
+                <div class="card" style="border: 1px solid #ecc; background: #fffcfc;">
+                    <h2 style="color:#c0392b;">Cierre de Fin de Semana</h2>
+                    <button onclick="generarReporteFinal()" class="btn-action btn-green">📊 Generar e Imprimir Reporte Final (Excel)</button>
+                    <button onclick="borrarDatosFinDeSemana()" class="btn-action btn-red" style="margin-top:15px;">⚠️ RESETEAR CAJA A 0 (Hacer solo al terminar el domingo)</button>
+                </div>
+
+                <div class="card">
+                    <button onclick="toggleSeccion('config-precios')" class="btn-action btn-gray" style="margin-top:0;">⚙️ Configurar Precios, Colores y Agregar Productos</button>
+                    <div id="config-precios" class="collapsible-content">
+                        
+                        <div style="background: #f9f9f9; padding: 12px; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 15px;">
+                            <h4>➕ Crear Nuevo Producto Permanentemente</h4>
+                            <div style="margin-top: 8px;">
+                                <input type="text" id="nuevo-prod-nombre" placeholder="Nombre (ej: Cola Mediana)" style="width:100%; padding:6px; margin-bottom:6px; border:1px solid #ccc; border-radius:4px;">
+                                <input type="number" id="nuevo-prod-precio" step="0.01" placeholder="Precio $ (ej: 1.25)" style="width:48%; padding:6px; display:inline-block; border:1px solid #ccc; border-radius:4px;">
+                                <select id="nuevo-prod-color" style="width:48%; padding:6px; display:inline-block; border:1px solid #ccc; border-radius:4px;">
+                                    <option value="btn-color-azul">Color Azul</option>
+                                    <option value="btn-color-verde">Color Verde</option>
+                                    <option value="btn-color-naranja">Color Naranja</option>
+                                    <option value="btn-color-purpura">Color Púrpura</option>
+                                    <option value="btn-color-rojo">Color Rojo</option>
+                                </select>
+                                <button onclick="crearNuevoProductoMenu()" class="btn-action btn-blue" style="padding:8px; font-size:12px; margin-top:8px;">➕ Añadir Nuevo Producto</button>
+                            </div>
+                        </div>
+
+                        <h3>Editar Catálogo Existente</h3>
+                        <table class="price-table">
+                            <thead>
+                                <tr><th>Producto</th><th>Precio</th><th>Color Botón</th><th>Acción</th></tr>
+                            </thead>
+                            <tbody id="tabla-edicion-precios"></tbody>
+                        </table>
+                        <button onclick="guardarPreciosNuevos()" class="btn-action btn-green" style="margin-top:15px;">Guardar Cambios de Configuración</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="ticket-print-area"></div>
+
+    <script>
+        // === DATOS DE CONEXIÓN A INTERNET (SUPABASE) ===
+        const SUPABASE_URL = "https://dvrfzocnofwxtjxlzejs.supabase.co"; 
+        const SUPABASE_KEY = "PBXUY5e1@@@";
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // ===============================================
+
+        const productosIniciales = [
+            { id: "caldo_gallina", nombre: "Caldo de Gallina", precio: 3.50, color: "btn-color-azul" },
+            { id: "hornado", nombre: "Hornado", precio: 5.00, color: "btn-color-azul" },
+            { id: "fritada", nombre: "Fritada", precio: 3.50, color: "btn-color-azul" },
+            { id: "parrillada_p", nombre: "Parrillada Personal", precio: 4.00, color: "btn-color-verde" },
+            { id: "parrillada_c", nombre: "Parrillada Completa", precio: 6.00, color: "btn-color-verde" },
+            { id: "tabacos", nombre: "Tabacos", precio: 0.25, color: "btn-color-naranja" },
+            { id: "otros", nombre: "[Menú] Otros / Especial", precio: 0.00, color: "btn-color-purpura" }
+        ];
+
+        let productos = JSON.parse(localStorage.getItem('db_pro_prod')) || productosIniciales;
+        let pedidoActual = {};
+        let historialVentas = JSON.parse(localStorage.getItem('db_pro_ventas')) || [];
+        let egresos = JSON.parse(localStorage.getItem('db_pro_egresos')) || [];
+        let comentarios = JSON.parse(localStorage.getItem('db_pro_comentarios')) || [];
+        let editandoIndex = null;
+
+        function inicializar() {
+            renderMenu();
+            renderTablaPrecios();
+            actualizarTablaPedido();
+            renderEgresos();
+            renderHistorialPedidos();
+            renderComentarios();
+            conectarEscuchaCocina(); // Activa las alertas en tiempo real
+        }
+
+        // --- SISTEMA DE ALERTA DE PLATOS LISTOS ---
+        function conectarEscuchaCocina() {
+            _supabase.channel('notificaciones-caja')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos_cocina' }, payload => {
+                    const pedidoModificado = payload.new;
+                    if (pedidoModificado.estado === 'listo') {
+                        // Reproducir sonido de campana de restaurante
+                        try {
+                            let audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav');
+                            audio.play();
+                        } catch(e) {}
+                        alert(`🔔 ¡NOTIFICACIÓN DE COCINA!\nEl pedido de: "${pedidoModificado.mesa_cliente}" ya está listo en barra.`);
+                    }
+                }).subscribe();
+        }
+
+        // --- SINCRONIZACIÓN HACIA LA COCINA ---
+        async function enviarPedidoACocinaInternet(nombreCliente, itemsPedido) {
+            let platosFormateados = [];
+            for (const key in itemsPedido) {
+                platosFormateados.push({
+                    nombre: itemsPedido[key].nombre,
+                    cant: itemsPedido[key].cantidad,
+                    listo: false
+                });
+            }
+
+            if (editandoIndex !== null) {
+                // Si estamos editando o adicionando en una cuenta abierta
+                let { data } = await _supabase.from('pedidos_cocina')
+                    .select('id')
+                    .eq('mesa_cliente', nombreCliente)
+                    .eq('estado', 'pendiente').maybeSingle();
+
+                if (data) {
+                    // Si ya existe la comanda en cocina, le actualizamos/adicionamos los platos nuevos
+                    await _supabase.from('pedidos_cocina')
+                        .update({ platos: platosFormateados, estado: 'pendiente' })
+                        .eq('id', data.id);
+                    return;
+                }
+            }
+
+            // Si es un pedido completamente nuevo
+            await _supabase.from('pedidos_cocina').insert([{
+                mesa_cliente: nombreCliente || "Consumidor Final",
+                platos: platosFormateados,
+                estado: 'pendiente'
+            }]);
+        }
+
+        function renderMenu() {
+            const container = document.getElementById('menu-container');
+            container.innerHTML = '';
+            productos.forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = `menu-btn ${p.color}`;
+                btn.innerHTML = `${p.nombre} <span>$${p.precio.toFixed(2)}</span>`;
+                btn.onclick = () => p.id === 'otros' ? agregarProductoOtros() : agregarAlPedido(p.id);
+                container.appendChild(btn);
+            });
+        }
+
+        function crearNuevoProductoMenu() {
+            const nombre = document.getElementById('nuevo-prod-nombre').value.trim();
+            const precio = parseFloat(document.getElementById('nuevo-prod-precio').value);
+            const color = document.getElementById('nuevo-prod-color').value;
+
+            if (!nombre || isNaN(precio) || precio < 0) {
+                return alert("Por favor complete correctamente el nombre y precio del nuevo producto.");
+            }
+
+            const nuevoId = "prod_" + Date.now();
+            productos.push({ id: nuevoId, nombre: nombre, precio: precio, color: color });
+            localStorage.setItem('db_pro_prod', JSON.stringify(productos));
+            document.getElementById('nuevo-prod-nombre').value = '';
+            document.getElementById('nuevo-prod-precio').value = '';
+            renderMenu();
+            renderTablaPrecios();
+            alert(`"${nombre}" agregado con éxito al catálogo.`);
+        }
+
+        function renderTablaPrecios() {
+            const tbody = document.getElementById('tabla-edicion-precios');
+            tbody.innerHTML = '';
+            productos.forEach((p, index) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${p.nombre}</td>
+                        <td>$<input type="number" id="edit-val-${p.id}" value="${p.precio}" step="0.01" style="width:70px;"></td>
+                        <td>
+                            <select id="edit-col-${p.id}">
+                                <option value="btn-color-azul" ${p.color==='btn-color-azul'?'selected':''}>Azul</option>
+                                <option value="btn-color-verde" ${p.color==='btn-color-verde'?'selected':''}>Verde</option>
+                                <option value="btn-color-naranja" ${p.color==='btn-color-naranja'?'selected':''}>Naranja</option>
+                                <option value="btn-color-purpura" ${p.color==='btn-color-purpura'?'selected':''}>Púrpura</option>
+                                <option value="btn-color-rojo" ${p.color==='btn-color-rojo'?'selected':''}>Rojo</option>
+                            </select>
+                        </td>
+                        <td>
+                            ${p.id !== 'otros' ? `<button onclick="eliminarProductoDelMenu(${index})" class="mini-btn btn-red">🗑️</button>` : ''}
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function eliminarProductoDelMenu(index) {
+            if(confirm(`¿Deseas eliminar permanentemente "${productos[index].nombre}" del menú de botones?`)) {
+                productos.splice(index, 1);
+                localStorage.setItem('db_pro_prod', JSON.stringify(productos));
+                renderMenu();
+                renderTablaPrecios();
+            }
+        }
+
+        function guardarPreciosNuevos() {
+            productos.forEach(p => {
+                p.precio = parseFloat(document.getElementById(`edit-val-${p.id}`).value) || 0;
+                p.color = document.getElementById(`edit-col-${p.id}`).value;
+            });
+            localStorage.setItem('db_pro_prod', JSON.stringify(productos));
+            renderMenu(); actualizarTablaPedido();
+            alert('Configuración guardada exitosamente.');
+        }
+
+        function agregarAlPedido(id) {
+            if (pedidoActual[id]) { pedidoActual[id].cantidad += 1; } 
+            else {
+                const prod = productos.find(p => p.id === id);
+                pedidoActual[id] = { nombre: prod.nombre, precio: prod.precio, cantidad: 1 };
+            }
+            actualizarTablaPedido();
+        }
+
+        function agregarProductoOtros() {
+            let nombrePersonalizado = prompt("Ingrese el nombre del artículo/plato personalizado:");
+            if (!nombrePersonalizado) return;
+            let precioPersonalizado = parseFloat(prompt("Ingrese el precio de venta ($):"));
+            if (isNaN(precioPersonalizado) || precioPersonalizado < 0) return alert("Precio no válido");
+
+            let idUnico = "otro_" + Date.now();
+            pedidoActual[idUnico] = { nombre: nombrePersonalizado, precio: precioPersonalizado, cantidad: 1 };
+            actualizarTablaPedido();
+        }
+
+        function cambiarCantidad(id, cambio) {
+            if (pedidoActual[id]) {
+                pedidoActual[id].cantidad += cambio;
+                if (pedidoActual[id].cantidad <= 0) delete pedidoActual[id];
+                actualizarTablaPedido();
+            }
+        }
+
+        function actualizarTablaPedido() {
+            const tbody = document.getElementById('pedido-detalles');
+            tbody.innerHTML = ''; let total = 0;
+            for (const id in pedidoActual) {
+                const item = pedidoActual[id]; total += item.precio * item.cantidad;
+                tbody.innerHTML += `<tr><td>${item.nombre}</td><td style="text-align: center;"><button class="qty-btn" onclick="cambiarCantidad('${id}', -1)">-</button><strong>${item.cantidad}</strong><button class="qty-btn" onclick="cambiarCantidad('${id}', 1)">+</button></td><td style="text-align: right;">$${(item.precio * item.cantidad).toFixed(2)}</td></tr>`;
+            }
+            document.getElementById('total-pagar').innerText = total.toFixed(2);
+            calcularVuelto();
+        }
+
+        function calcularVuelto() {
+            const total = parseFloat(document.getElementById('total-pagar').innerText);
+            const metodo = document.getElementById('metodo-pago').value;
+            const seccionEfectivo = document.getElementById('seccion-efectivo');
+            const seccionMixto = document.getElementById('seccion-mixto');
+
+            if (metodo === 'efectivo') {
+                seccionEfectivo.style.display = 'block';
+                seccionMixto.style.display = 'none';
+                const pagado = parseFloat(document.getElementById('monto-pagado').value) || 0;
+                document.getElementById('monto-vuelto').innerText = pagado >= total ? (pagado - total).toFixed(2) : "0.00";
+            } else if (metodo === 'mixto') {
+                seccionEfectivo.style.display = 'none';
+                seccionMixto.style.display = 'block';
+                
+                const efe = parseFloat(document.getElementById('mixto-efectivo').value) || 0;
+                const trans = parseFloat(document.getElementById('mixto-transferencia').value) || 0;
+                const suma = efe + trans;
+                
+                document.getElementById('mixto-suma-ingresada').innerText = suma.toFixed(2);
+                
+                if (suma >= total) {
+                    document.getElementById('mixto-vuelto').innerText = (suma - total).toFixed(2);
+                } else {
+                    document.getElementById('mixto-vuelto').innerText = "0.00";
+                }
+            } else {
+                seccionEfectivo.style.display = 'none';
+                seccionMixto.style.display = 'none';
+            }
+        }
+
+        // --- PROCESAR / GUARDAR VENTAS Y ADICIONES ---
+        async function procesarVenta(imprimir = false) {
+            const total = parseFloat(document.getElementById('total-pagar').innerText);
+            if (total <= 0) return alert("El pedido está vacío.");
+
+            const nombreCliente = document.getElementById('cliente-nombre').value.trim() || "Consumidor Final";
+            const metodo = document.getElementById('metodo-pago').value;
+
+            let itemsArreglo = [];
+            for (const id in pedidoActual) {
+                itemsArreglo.push({ nombre: pedidoActual[id].nombre, precio: pedidoActual[id].precio, cantidad: pedidoActual[id].cantidad });
+            }
+
+            const ventaData = {
+                cliente: nombreCliente,
+                telefono: document.getElementById('cliente-telefono').value,
+                direccion: document.getElementById('cliente-direccion').value,
+                metodo: metodo,
+                items: itemsArreglo,
+                total: total,
+                fecha: new Date().toLocaleString(),
+                pagoMixtoEfectivo: parseFloat(document.getElementById('mixto-efectivo').value) || 0,
+                pagoMixtoTransferencia: parseFloat(document.getElementById('mixto-transferencia').value) || 0
+            };
+
+            if (editandoIndex !== null) {
+                historialVentas[editandoIndex] = ventaData;
+            } else {
+                historialVentas.push(ventaData);
+            }
+
+            localStorage.setItem('db_pro_ventas', JSON.stringify(historialVentas));
+
+            // ENVÍA AUTOMÁTICAMENTE EL PEDIDO A LA COCINA DIGITAL POR INTERNET
+            await enviarPedidoACocinaInternet(nombreCliente, pedidoActual);
+
+            if (imprimir) {
+                ejecutarImpresionTicket(ventaData);
+            }
+
+            cancelarPedidoActual();
+            renderHistorialPedidos();
+            alert("Pedido guardado y enviado a la cocina con éxito.");
+        }
+
+        function ejecutarImpresionTicket(v) {
+            const area = document.getElementById('ticket-print-area');
+            let itemsHtml = '';
+            v.items.forEach(i => {
+                itemsHtml += `
+                <div class="ticket-row">
+                    <span class="left-part">${i.cantidad}x ${i.nombre}</span>
+                    <span class="right-part">$${(i.precio * i.cantidad).toFixed(2)}</span>
+                </div>`;
+            });
+
+            area.innerHTML = `
+                <div class="ticket-header">PARADERO KALIKANTO</div>
+                <div class="ticket-header" style="font-size:10px;">Hecho en Leña</div>
+                <div class="ticket-divider"></div>
+                <div><b>Fecha:</b> ${v.fecha}</div>
+                <div><b>Cli:</b> ${v.cliente}</div>
+                <div class="ticket-divider"></div>
+                ${itemsHtml}
+                <div class="ticket-divider"></div>
+                <div class="ticket-row" style="font-weight:bold;">
+                    <span class="left-part">TOTAL:</span>
+                    <span class="right-part">$${v.total.toFixed(2)}</span>
+                </div>
+                <div class="ticket-header" style="margin-top:10px; font-size:10px;">¡Gracias por su visita!</div>
+            `;
+            window.print();
+        }
+
+        function cargarPedidoParaEditar(index) {
+            editandoIndex = index;
+            const v = historialVentas[index];
+
+            document.getElementById('indicador-edicion').style.display = 'inline-block';
+            document.getElementById('num-pedido-editando').innerText = `(Editando: ${v.cliente})`;
+            document.getElementById('btn-solo-registrar').innerText = '🔄 Actualizar Pedido Abierto';
+
+            document.getElementById('cliente-nombre').value = v.cliente;
+            document.getElementById('cliente-telefono').value = v.telefono;
+            document.getElementById('cliente-direccion').value = v.direccion;
+            document.getElementById('metodo-pago').value = v.metodo;
+
+            pedidoActual = {};
+            v.items.forEach((item, idx) => {
+                pedidoActual[`id_edit_${idx}`] = { nombre: item.nombre, precio: item.precio, cantidad: item.cantidad };
+            });
+
+            actualizarTablaPedido();
+        }
+
+        function cancelarPedidoActual() {
+            pedidoActual = {}; editandoIndex = null;
+            document.getElementById('indicador-edicion').style.display = 'none';
+            document.getElementById('num-pedido-editando').innerText = '';
+            document.getElementById('btn-solo-registrar').innerText = '💾 Solo Registrar Pedido';
+            actualizarTablaPedido();
+            document.getElementById('cliente-nombre').value = '';
+            document.getElementById('cliente-telefono').value = '';
+            document.getElementById('cliente-direccion').value = '';
+            document.getElementById('monto-pagado').value = '';
+            document.getElementById('mixto-efectivo').value = '';
+            document.getElementById('mixto-transferencia').value = '';
+        }
+
+        function eliminarPedidoRegistrado(index) {
+            if (confirm("¿Estás seguro de eliminar este pedido del sistema?")) {
+                historialVentas.splice(index, 1);
+                localStorage.setItem('db_pro_ventas', JSON.stringify(historialVentas));
+                renderHistorialPedidos();
+            }
+        }
+
+        function renderHistorialPedidos() {
+            const tabPagados = document.getElementById('tab-pagados');
+            const tabCobrar = document.getElementById('tab-cobrar');
+            tabPagados.innerHTML = ''; tabCobrar.innerHTML = '';
+
+            historialVentas.forEach((v, index) => {
+                const item = document.createElement('div');
+                const esPorCobrar = (v.metodo === 'por_cobrar');
+                item.className = `order-card-item ${esPorCobrar ? 'por_cobrar' : 'pagado'}`;
+                
+                let itemsStr = ''; v.items.forEach(i => { itemsStr += `${i.cantidad}x ${i.nombre}, `; });
+                
+                let botones = `
+                    <div class="action-container">
+                        ${esPorCobrar ? `<button class="mini-btn btn-orange" onclick="cargarPedidoParaEditar(${index})">✏️ Editar / Adicionar</button>` : ''}
+                        <button class="mini-btn btn-red" onclick="eliminarPedidoRegistrado(${index})">🗑️</button>
+                    </div>`;
+
+                item.innerHTML = `
+                    ${botones}
+                    <div><b>Cliente/Mesa:</b> ${v.cliente}</div>
+                    <div><b>Detalle:</b> ${itemsStr.slice(0, -2)}</div>
+                    <div style="margin-top:5px; font-weight:bold; color:${esPorCobrar ? '#e67e22':'#27ae60'}">Total: $${v.total.toFixed(2)} (${v.metodo.toUpperCase()})</div>
+                    <div style="font-size:10px; color:#7f8c8d;">${v.fecha}</div>
+                `;
+
+                if (esPorCobrar) tabCobrar.appendChild(item);
+                else tabPagados.appendChild(item);
+            });
+        }
+
+        /* CRUD EGRESOS */
+        function guardarEgreso() {
+            const motivo = document.getElementById('egreso-motivo').value.trim();
+            const monto = parseFloat(document.getElementById('egreso-monto').value);
+            const index = parseInt(document.getElementById('egreso-edit-index').value);
+
+            if (!motivo || isNaN(monto) || monto <= 0) return alert('Verifique los campos del egreso.');
+
+            if (index === -1) {
+                egresos.push({ motivo: motivo, monto: monto });
+            } else {
+                egresos[index] = { motivo: motivo, monto: monto };
+                document.getElementById('egreso-edit-index').value = "-1";
+                document.getElementById('btn-salvar-egreso').innerText = "Guardar Gasto";
+            }
+
+            localStorage.setItem('db_pro_egresos', JSON.stringify(egresos));
+            document.getElementById('egreso-motivo').value = ''; document.getElementById('egreso-monto').value = '';
+            renderEgresos();
+        }
+
+        function renderEgresos() {
+            const tbody = document.getElementById('tabla-egresos-cuerpo');
+            tbody.innerHTML = '';
+            egresos.forEach((e, idx) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${e.motivo}</td>
+                        <td>$${e.monto.toFixed(2)}</td>
+                        <td>
+                            <button class="mini-btn btn-orange" onclick="cargarEgresoEnForm(${idx})
